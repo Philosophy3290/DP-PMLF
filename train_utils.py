@@ -47,3 +47,27 @@ def train_with_momentum(model, train_dl, optimizer, criterion, log_file, device 
         #     print('Epoch: %d:%d Train Loss: %.3f | Acc: %.3f%% (%d/%d)'% (epoch, t+1, train_loss, 100.*correct/total, correct, total))
         #     if log_frequency>0 and ((t+1)%(acc_step*log_frequency) == 0 or t+1 == len(train_dl)):
         #         log_file.update([epoch, t],[100.*correct/total, train_loss])
+
+@torch.no_grad()
+def test(model, test_dl, criterion, log_file, device = 'cpu', epoch = -1, **kwargs):
+    model.eval()
+    model.to(device)
+    test_loss = 0
+    correct = 0
+    total = 0
+    criterion = torch.nn.CrossEntropyLoss()
+    with torch.no_grad():
+        for batch_idx, (inputs, targets) in enumerate(test_dl):
+            inputs, targets = inputs.to(device), targets.to(device)
+            outputs = model(inputs)
+            if not isinstance(outputs, torch.Tensor):
+                outputs = outputs.logits
+            loss = criterion(outputs, targets)
+
+            test_loss += loss.item()
+            _, predicted = outputs.max(1)
+            total += targets.size(0)
+            correct += predicted.eq(targets).sum().item()
+    print('Epoch: ', epoch, 'Test Loss: %.3f | Acc: %.3f%% (%d/%d)' % (test_loss/(batch_idx+1), 100.*correct/total, correct, total))
+    print(" ")
+    log_file.update([epoch, -1],[100.*correct/total, test_loss/(batch_idx+1)])

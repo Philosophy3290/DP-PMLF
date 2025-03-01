@@ -13,7 +13,7 @@ try:
     HAS_WANDB = True
 except ImportError as e:
     HAS_WANDB = False
-from model_utils import LinearModel, CNN5, create_roberta
+from model_utils import LinearModel, CNN5
 
 def base_parse_args(parser):
     # Task arguments
@@ -60,18 +60,14 @@ def task_init(args):
         # model = timm.create_model(args.model, pretrained=args.pretrained, num_classes = 100)
         train_dl, test_dl = generate_Cifar(args.mnbs, args.data, args.model)
         sample_size = 50000
-    elif args.data == 'imgnet1k':
-        num_classes = 1000
-        train_dl, test_dl = generate_imgnet1k(args.mnbs)
-        sample_size = len(train_dl.dataset)
     elif args.data == 'mnist':
         model = LinearModel(28*28, 10)
         train_dl, test_dl = generate_Mnist(args.mnbs, args.data)
         sample_size = 60000
     elif args.data == 'fashion-mnist':
-        model = LinearModel(28*28, 10)  # 和 MNIST 一样是 28*28 输入，10个类别
+        model = LinearModel(28*28, 10) 
         train_dl, test_dl = generate_FashionMnist(args.mnbs, args.data)
-        sample_size = 60000  # Fashion-MNIST 的训练集大小也是 60000
+        sample_size = 60000 
     if model is None:
         if args.model != 'cnn5':
             model = timm.create_model(args.model, pretrained=args.pretrained, num_classes = num_classes)
