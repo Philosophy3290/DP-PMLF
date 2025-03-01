@@ -26,42 +26,23 @@ def base_parse_args(parser):
     parser.add_argument('--save_path', default=None, type=str, help='save checkpoint is specified')
     parser.add_argument('--save_freq', default=999, type=int, help='checkpoint saving frequency')
 
-    parser.add_argument('--data', default='cifar100', type=str, help='dataset (cifar10, cifar100)')
+    parser.add_argument('--data', default='cifar10', type=str, help='dataset (cifar10, cifar100)')
     parser.add_argument('--bs', default=256, type=int, help='batch size')
     parser.add_argument('--mnbs', default=32, type=int, help='mini batch size')
     parser.add_argument('--model', default = 'vit_small_patch16_224', type=str, help='trained model')
     parser.add_argument('--pretrained', action='store_true', help='use pre-trained weights')
 
     # Algorithm parameters
-    parser.add_argument('--algo', default='sgd', type=str, help='algorithm (sgd/adam)')
     parser.add_argument('--lr', default=0.01, type=float, help='learning rate list')
     parser.add_argument('--beta', default=0.999, type=float, help='beta for adam')
     parser.add_argument('--epoch', default=3, type=int,help='number of public epochs')
-    parser.add_argument('--scheduler',action="store_true" ,help='use 1 cycle lr scheduler')
 
     # DP parameters
-    parser.add_argument('--clipping', action="store_true", help="use gradient clipping")
-    parser.add_argument('--noise', default=0, type=float, help='add dp noise, 0: no noise, -1: dp noise by epsilon, >0: manual noise')
     parser.add_argument('--epsilon', default=8, type=float, help='dp privacy, must be larger than 0, used when noise is not specified')
     parser.add_argument('--clipping_norm', default=-1,  type=float, help='clipping style, <=0: automatic, >0: Abadi')
     parser.add_argument('--clipping_style', default='all-layer', type=str, help='clipping style, all-layer, layer-wise, param-wise')
     return parser
 
-def lp_parse_args(parser):
-    parser = base_parse_args(parser)
-    # LPSGD parameter
-    parser.add_argument('--coef_file', default='./coefs/2.csv', type=str, help='coefficients')
-    return parser
-
-# def galore_parse_args(parser):
-#     parser = lp_parse_args(parser)
-#     # GaLore parameters
-#     parser.add_argument("--rank", type=int, default=128)
-#     parser.add_argument("--update_proj_gap", type=int, default=50)
-#     parser.add_argument("--galore_scale", type=float, default=1.0)
-#     parser.add_argument("--proj_type", type=str, default="std")
-#     return parser
-    
 def task_init(args):
     device = torch.device('cuda:'+str(args.cuda)) if torch.cuda.is_available() else torch.device('cpu')
     if args.clipping_norm <=0:
@@ -102,11 +83,8 @@ def task_init(args):
         checkpoint = torch.load(args.model_path, map_location='cuda')
         model.load_state_dict(checkpoint['model'], strict = True)
         # optimizer.load_state_dict(state_dicts['optimizer'])
-    
-    if args.noise < 0 :
-        noise = get_noise_multiplier(target_delta=1.0/(sample_size)**1.1, target_epsilon=args.epsilon, sample_rate=args.bs/sample_size, epochs=args.epoch)
-    else:
-        noise = args.noise
+
+    noise = get_noise_multiplier(target_delta=1.0/(sample_size)**1.1, target_epsilon=args.epsilon, sample_rate=args.bs/sample_size, epochs=args.epoch)
     acc_step = args.bs//args.mnbs
     
     return train_dl, test_dl, model, device, sample_size, acc_step, noise
