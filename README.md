@@ -27,7 +27,8 @@ To use the tool, simply run the following command:
 | `--coef_file` | Low-pass Filter Coefficients | 
 
 
-Here's an example of how to use the tool:\\
+Here's an example of how to use the tool:
+
 ```python DPPMLF.py --data MNIST --model cnn5 --bs 1000 --mnbs 200 --lr 0.5 --epoch 25 --epsilon 1 --momentum_length 2 --inner_momentum 0.1 --coef_file ./coefs/a9b1.csv```
 
 ## Acknowledgements
