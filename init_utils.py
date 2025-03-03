@@ -1,25 +1,16 @@
 import torch
-import math
 from data_utils import generate_Cifar, generate_Mnist, generate_FashionMnist
 from opacus.accountants.utils import get_noise_multiplier
 from opacus.validators import ModuleValidator
-import argparse
-import warnings
 import timm
 import os
 from datetime import datetime
-try:
-    import wandb
-    HAS_WANDB = True
-except ImportError as e:
-    HAS_WANDB = False
 from model_utils import LinearModel, CNN5
 
 def base_parse_args(parser):
     # Task arguments
     parser.add_argument('--cuda', default=0, type=int, help='cuda device')
     parser.add_argument('--tag', default = '', type=str, help='log file tag')
-    parser.add_argument('--log_type', default='file',type=str, help='log type (file, wandb)')
     parser.add_argument('--log_path', default = './log', type=str, help='log file path')
     parser.add_argument('--log_freq', default=-1, type=int, help='log frequency during training')
     parser.add_argument('--load_path', default=None, type=str, help='load checkpoint if specified')
@@ -57,7 +48,6 @@ def task_init(args):
         sample_size = 50000
     elif args.data == 'cifar100':
         num_classes = 100
-        # model = timm.create_model(args.model, pretrained=args.pretrained, num_classes = 100)
         train_dl, test_dl = generate_Cifar(args.mnbs, args.data, args.model)
         sample_size = 50000
     elif args.data == 'mnist':
@@ -78,7 +68,6 @@ def task_init(args):
     if args.load_path is not None:
         checkpoint = torch.load(args.model_path, map_location='cuda')
         model.load_state_dict(checkpoint['model'], strict = True)
-        # optimizer.load_state_dict(state_dicts['optimizer'])
 
     noise = get_noise_multiplier(target_delta=1.0/(sample_size)**1.1, target_epsilon=args.epsilon, sample_rate=args.bs/sample_size, epochs=args.epoch)
     acc_step = args.bs//args.mnbs
@@ -86,23 +75,11 @@ def task_init(args):
     return train_dl, test_dl, model, device, sample_size, acc_step, noise
 
 def logger_init(args, noise, steps_per_epoch, type = 'file'):
-    if type == 'file' or not HAS_WANDB:
-        if not os.path.isdir(args.log_path):
-            os.makedirs(args.log_path)
-        # if not os.path.isdir(args.log_path+'/G'):
-        #     os.makedirs(args.log_path+'/G')
-        # datetime object containing current date and time
-        log_file_path = '%s/%s'%(args.log_path,args.tag)
-        if hasattr(args, 'coef_file'):
-            log_file = file_logger(log_file_path, 2, ["acc","loss"], steps_per_epoch, heading = "Data=%s, Model=%s, E=%d, B=%d, lr=%-.6f, sigma=%-.6f, coef=%s"%(args.data, args.model, args.epoch, args.bs, args.lr, noise, args.coef_file))
-        else:
-            log_file = file_logger(log_file_path, 2, ["acc","loss"], steps_per_epoch, heading = "Data=%s, Model=%s, E=%d, B=%d, lr=%-.6f, sigma=%-.6f"%(args.data, args.model, args.epoch, args.bs, args.lr, noise))
-        return log_file
-    elif type == 'wandb' and HAS_WANDB:
-        log_wanb = wanb_logger(args, noise, steps_per_epoch)
-        return log_wanb
-    else:
-        raise RuntimeError('incorrect logger')
+    if not os.path.isdir(args.log_path):
+        os.makedirs(args.log_path)
+    log_file_path = '%s/%s'%(args.log_path,args.tag)
+    log_file = file_logger(log_file_path, 2, ["acc","loss"], steps_per_epoch, heading = "Data=%s, Model=%s, E=%d, B=%d, lr=%-.6f, sigma=%-.6f, coef=%s"%(args.data, args.model, args.epoch, args.bs, args.lr, noise, args.coef_file))
+    return log_file
     
 
 class file_logger():
@@ -143,35 +120,3 @@ class file_logger():
                 print(log_info, file=fp)
         
 
-class wanb_logger():
-    def __init__(self, args, noise, steps_per_epoch):
-        self.epoch_per_step = 1.0/steps_per_epoch
-        tag = args.tag+'_'+args.data+'_'+str(args.epsilon)+'_'+str(args.lr)+'_'+str(args.bs)+'_'+str(args.epoch)
-        run_config = dict(vars(args))
-        run_config.update({
-            "noise": noise,
-            "tag": tag,
-        })
-        wandb.init(
-            project='DPLPF',
-            entity='xinweiz-usc',
-            name=tag
-        )
-        wandb.config.update(run_config, allow_val_change=True)
-    def update(self, time_list, item_list):
-        if len(time_list)!=2:
-            raise RuntimeError('incorrect log time information')
-        if time_list[1] == -1:
-            # test log
-            wandb.log({
-                "test_epoch": time_list[0],
-                "test_acc": item_list[0],
-                "test_loss": item_list[1],
-            })
-        else:
-            # train log
-            wandb.log({
-                "train_epoch": time_list[0]+time_list[1]*self.epoch_per_step,
-                "train_acc": item_list[0],
-                "train_loss": item_list[1],
-            })

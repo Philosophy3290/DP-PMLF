@@ -1,7 +1,20 @@
 import torch
-from torch.optim.optimizer import Optimizer, required
+from torch.optim.optimizer import Optimizer
 
 class DPLinearMomentumOptimizer(Optimizer):
+    '''
+    This optimizer maintains a history of past parameter values and gradients, then applies
+    both per-sample momentum (inner momentum) and update-based linear momentum (outer momentum)
+    to improve optimization performance while maintaining privacy guarantees.
+    
+    Args:
+        params: Model parameters to optimize
+        optimizer: Base optimizer to use (e.g., SGD)
+        inner_k0: Number of historical gradients to use for inner momentum
+        inner_gamma: Decay factor for inner momentum weights
+        a: Low-pass filter coefficients
+        b: Low-pass filter coefficients
+    '''
     def __init__(self, params, optimizer: Optimizer, inner_k0=5, inner_gamma=0.1,
                  a=None, b=None):
         self.optimizer = optimizer
@@ -35,6 +48,19 @@ class DPLinearMomentumOptimizer(Optimizer):
                         p.param_history.append(p.data.clone())
 
     def prestep(self, closure):
+        """
+        Computes gradients for the current parameters and historical parameter values,
+        then combines them using weighted averaging based on inner momentum settings.
+        
+        This function is called before the main optimization step to prepare gradients
+        with momentum incorporated at the per-sample level.
+        
+        Args:
+            closure: A closure that reevaluates the model and returns the loss
+            
+        Returns:
+            loss: The current loss value
+        """
         loss = None
         inner_grads = []
 
@@ -84,6 +110,18 @@ class DPLinearMomentumOptimizer(Optimizer):
         return loss
 
     def step(self, closure=None):
+        """
+        Performs a single optimization step using the gradients computed in prestep.
+        
+        This method applies the low-pass filter defined by 
+        coefficients a and b, and then calls the base optimizer's step method.
+        
+        Args:
+            closure: A closure that reevaluates the model and returns the loss
+            
+        Returns:
+            loss: The loss value returned by the base optimizer
+        """
         loss = None
         if closure is not None:
             loss = closure()

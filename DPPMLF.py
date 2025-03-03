@@ -10,6 +10,16 @@ import warnings
 from combined_optimizer import DPLinearMomentumOptimizer
 
 if __name__ == '__main__':
+    """
+    Main entry point for running Differentially Private training with Per-sample Momentum and Linear Filtering.
+    
+    This script:
+    1. Parses command line arguments
+    2. Initializes training components (model, data loaders, etc.)
+    3. Reads filter coefficients from a specified file
+    4. Sets up the optimizer with linear momentum and DP components
+    5. Runs the training loop with differential privacy
+    """
     warnings.filterwarnings("ignore")
     
     # Parse arguments
@@ -18,13 +28,13 @@ if __name__ == '__main__':
     
     # Add momentum specific arguments
     parser.add_argument('--momentum_length', type=int, default=2, help='number of history steps for inner momentum')
-    parser.add_argument('--coef_file', default='./coefs/2.csv', type=str, help='coefficients')
+    parser.add_argument('--coef_file', default='./coefs/a9b1.csv', type=str, help='coefficients')
     parser.add_argument('--inner_momentum', default=0.1, type=float, help='per-sample momentum coefficients')
     args = parser.parse_args()
 
     # Initialize training
     train_dl, test_dl, model, device, sample_size, acc_step, noise = task_init(args)
-    log_file = logger_init(args, noise, sample_size//args.mnbs, type=args.log_type)
+    log_file = logger_init(args, noise, sample_size//args.mnbs)
 
     # Read coefficients from file
     with open(args.coef_file, "r") as f:
